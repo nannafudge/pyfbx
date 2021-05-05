@@ -1,4 +1,4 @@
-from fbx_exception import FBXException
+from . import FBXException
 
 
 class InvalidFBXFileException(FBXException):

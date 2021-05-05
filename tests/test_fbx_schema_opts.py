@@ -1,7 +1,7 @@
 import pytest, pyfbx
 
 from pyfbx.schemas.fbx_options import OperatingMode
-from pyfbx.schemas.fbx_options import FBXOptions, FBXOptionsMeta
+from pyfbx.schemas.fbx_options import FBXOptions
 
 from pyfbx.exceptions.fbx_exception import FBXException
 
@@ -17,16 +17,18 @@ class TestFBXSchemaOpts():
 
         assert(getattr(opts, 'operating_mode') is not None)
         assert(getattr(opts, 'operating_mode') in OperatingMode)
+        assert(getattr(opts, 'streaming') is not None)
+        assert(getattr(opts, 'streaming') is True)
 
     def test_setting_operating_mode_value(self):
-        meta = FBXOptionsMeta(operating_mode=OperatingMode.JSON)
+        meta = FBXOptions.Meta(OperatingMode.JSON)
         opts = FBXOptions(meta)
 
         assert(getattr(opts, 'operating_mode') is OperatingMode.JSON)
 
     def test_setting_invalid_operating_mode(self):
         with pytest.raises(FBXException) as test_result:
-            meta = FBXOptionsMeta(operating_mode=556)
+            meta = FBXOptions.Meta(556)
             opts = FBXOptions(meta)
         
         self.logger.debug(str(test_result.value))
