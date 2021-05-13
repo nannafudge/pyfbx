@@ -8,6 +8,8 @@ import logging.config
 
 from pathlib import Path
 
+from marshmallow import ValidationError
+
 logging.config.fileConfig('logging.conf')
 
 logger = logging.getLogger(__name__)
@@ -16,8 +18,16 @@ def load_file(path:str, streaming: bool = False):
     logger.debug(f'Loading {path}...')
 
     options = FBXOptions(FBXOptions.Meta(streaming=streaming))
-    data = load_raw_file(path, streaming)
-    FBXFile().load(data=data)
+    
+    if not Path(path).exists():
+        raise exceptions.InvalidFBXFileException(f'FBX file {path} does not exist!')
+
+    with open(path, 'rb') as fbx_file:
+        try:
+            FBXFile().load(data=fbx_file)
+        except ValidationError as e:
+            logger.error(e.valid_data)
+            raise e
 
 @synchronized
 def load_raw_file(path: str, streaming: bool = True):

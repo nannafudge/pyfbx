@@ -1,35 +1,50 @@
-from marshmallow import schema, fields, ValidationError, pre_load, post_dump, validates_schema
+from marshmallow import schema, fields, ValidationError, pre_load, post_dump, validates, validates_schema
 
 from . import fields as fbx_fields
 
+from .fbx_node import FBXNode
+from .fbx_header import FBXHeaderExtension
 from .fbx_options import FBXOptions, OperatingMode as FBXOperatingMode
 
 from pyfbx.utils.threadsafe_iter import threadsafe_iter
 
 import logging
 
-class FBXFile(schema.Schema):
+from io import IOBase
+from enum import Enum
+
+class FBXFile(FBXNode):
+    class FBXFileType(Enum):
+        BINARY = 0
+        TEXT = 1
+
     OPTIONS_CLASS = FBXOptions
 
-    file_path = ''
-    operating_mode = FBXOperatingMode.BINARY
     # 0 = FBX JSON, 1 is FBX Binary
-    header = fields.Nested(fbx_fields.fbx_header.FBXHeader())
+    FBXHeaderExtension = fields.Nested(FBXHeaderExtension)
 
     @pre_load(pass_many=True)
-    def preload_fbx(self, data, many, **kwargs):
-        logging.debug("FUCKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK")
-        if isinstance(data, threadsafe_iter):
-            for line in data:
-                return line
-    
+    def preload_fbx(self, data, many, **kwargs):        
+        if isinstance(data, IOBase):
+            self.context['stream'] = True
+
+            header_meta = data.peek(1)[:20]
+
+            if u'binary' in header_meta.decode('utf-8').lower():
+                self.context['mode'] = FBXFile.FBXFileType.BINARY
+            else:
+                self.context['mode'] = FBXFile.FBXFileType.TEXT
+
+            return {'FBXHeaderExtension': data}
+
+        self.context['stream'] = False
         return {}
 
     @post_dump(pass_many=True)
-    def postdump_fbx(self, data, many, **kwargs):
+    def postdump_node(self, data, many, **kwargs):
         key = self.opts.plural_name if many else self.opts.name
         return {key: data}
     
-    @validates_schema(pass_many=True)
-    def validate_schema(self, data, many, **kwargs):
-        return True
+    @validates("FBXHeaderExtension")
+    def validate_header(self, data):
+        pass

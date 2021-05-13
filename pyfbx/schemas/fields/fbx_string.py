@@ -1,0 +1,2 @@
+class FBXString():
+    pass

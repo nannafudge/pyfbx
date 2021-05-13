@@ -1,1 +1,3 @@
-from . import fbx_field, fbx_header
+from .fbx_field import FBXField
+from .fbx_int import FBXInt
+from .fbx_string import FBXString
