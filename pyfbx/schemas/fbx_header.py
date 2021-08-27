@@ -1,4 +1,5 @@
 from marshmallow import ValidationError, fields
+from marshmallow.decorators import pre_load
 
 from . import fields as fbx_fields
 from .fbx_node import FBXNode

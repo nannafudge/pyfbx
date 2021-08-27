@@ -1,0 +1,107 @@
+'''
+Kaydara FBX Binary Header (21 BYTES) [0-20]
+Version_Index (1 byte) + NULL_RECORD [21-22]
+Version: (4 bytes) [23-26]
+Name Length Byte: (1 Byte) [27-28]
+
+Num Properties: (4 bytes)
+Property List Len (4 bytes)
+Property Len (4 bytes)
+Offset (4 bytes)
+'''
+
+4B 61 79 64 61 72 61 20 46 42 58 20 42 69 6E 61 72 79 "KAYDARA FBX BINARY"
+
+20 20 00 1A # Sig? FileID? (436215840)
+
+# ROOT NODE
+
+00  # Name Len? (0)
+84 1C 00 00 (7300) "Version"
+
+AB 07 00 00 # 1963
+00 00 00 00 # 0 # Depth
+00 00 00 00 # 0 # Children
+
+12 # Name Len (18)
+46 42 58 48 65 61 64 65 72 45 78 74 65 6E 73 69 6F 6E "FBXHeaderExtension"
+
+5C 00 00 00 # 92
+01 00 00 00 # 1 # Depth
+05 00 00 00 # 5 # Children
+
+
+10 # Name Len (16)
+46 42 58 48 65 61 64 65 72 56 65 72 73 69 6F 6E "FBXHeaderVersion"
+
+49 # Type
+
+EB 03 00 00 # 1003
+
+78 00 00 00 # 120 Offset?
+01 00 00 00 # 1 # Depth
+05 00 00 00 # 5 # Children
+
+0A # Name Len (10)
+46 42 58 56 65 72 73 69 6F 6E "FBX Version"
+
+49 # Type
+
+84 1C 00 00 # 7300
+
+98 00 00 00 # 152 # Offset
+01 00 00 00 # 1 # Depth
+05 00 00 00 # 5 # Children
+
+0E # Name Len
+45 6E 63 72 79 70 74 69 6F 6E 54 79 70 65 "EncryptionType"
+
+49 # Type
+
+00 00 00 00 # 0
+
+81 01 00 00 # 382
+00 00 00 00 # 0 Depth
+00 00 00 00 # 0 Parent? Children?
+
+11 (17)
+43 72 65 61 74 69 6F 6E 54 69 6D 65 53 74 61 6D 70 "CreationTimeStamp"
+
+CF 00 00 00 # 207
+01 00 00 00 # 1
+05 00 00 00 # 5
+
+07 (7)
+56 65 72 73 69 6F 6E "Version"
+
+49 # Type I
+
+E8 03 00 00 # 1000
+
+E5 00 00 00 # 229
+01 00 00 00 # 1
+05 00 00 00 # 5
+
+04
+
+
+...
+
+
+0B
+4D 69 6C 6C 69 73 65 63 6F 6E 64 "Millisecond"
+
+49 "Type I"
+
+F4 00 00 00 "244"
+
+00 00 00 00
+00 00 00 00
+00 00 00 00 
+
+00
+BC 01 00 00 # 444
+01 00 00 00 # 1
+27 00 00 00 # 39
+
+07

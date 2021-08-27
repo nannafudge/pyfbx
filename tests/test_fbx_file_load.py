@@ -5,7 +5,6 @@ from pyfbx.exceptions import FBXException
 
 import logging
 
-
 class TestFBXFileLoad():
 
     logger = logging.getLogger(__name__)
@@ -33,4 +32,4 @@ class TestFBXFileLoad():
 
     def test_fbx_load_file(self):
         self.logger.debug("START test_fbx_load_file")
-        pyfbx.load_file(self.BINARY_FBX_FILE_PATH, streaming=True)
+        self.logger.debug(pyfbx.load_file(self.BINARY_FBX_FILE_PATH, streaming=True))
