@@ -48,30 +48,30 @@ pybran.refresh()
 
 pybran.type_registry.add(int)
 pybran.type_registry.add(double)
-pybran.type_registry.add(enum)
 pybran.type_registry.add(object)
 pybran.type_registry.add(bool)
 
 
 serializers = {
-    int: IntSerializer,
-    long: LongSerializer,
-    short: ShortSerializer,
+    int: PrimitiveSerializer,
+    long: PrimitiveSerializer,
+    short: PrimitiveSerializer,
+    char: PrimitiveSerializer,
+    bool: PrimitiveSerializer,
+    float: PrimitiveSerializer,
+    double: PrimitiveSerializer,
+    enum.IntEnum: PrimitiveSerializer,
+
     str: StringSerializer,
-    char: CharSerializer,
-    bool: BoolSerializer,
     bytes: BytesSerializer,
     list: ListSerializer,
-    float: FloatSerializer,
-    double: DoubleSerializer,
-    enum: EnumSerializer,
-    float_or_int: FloatOrIntSerializer,
 
     FBXArray: ListSerializer,
     IntArray: ListSerializer,
     LongArray: ListSerializer,
     FloatArray: ListSerializer,
     DoubleArray: ListSerializer,
+    BoolArray: ListSerializer,
 
     FBXFile: FBXFileSerializer,
 

@@ -1,19 +1,63 @@
+import enum
 import os
-import struct
 import io
+import struct
 
 from pybran.decorators import class_registry, type_registry
 from pybran.serializers import Serializer
 
 from pyfbx import FBXFile
 from pyfbx.exceptions import FBXSerializationException, FBXValidationException
-from pyfbx.schemas.common import FBXNode, FBXArray, long, double, short
+from pyfbx.schemas.common import FBXNode, FBXArray, long, double, short, char
 
 import zlib
 
 import logging
 
 log = logging.getLogger(__name__)
+
+
+byte_sizes = {
+    bool: 1,
+    char: 1,
+    short: 2,
+    int: 4,
+    float: 4,
+    long: 8,
+    double: 8,
+}
+
+struct_formatters = {
+    bool: '?',
+    char: 'B',
+    short: 'h',
+    int: 'i',
+    float: 'f',
+    long: 'q',
+    double: 'd',
+}
+
+
+class PrimitiveSerializer(Serializer):
+    def serialize(self, loader, obj, **kwargs):
+        primitive_type = type(obj)
+
+        if primitive_type not in struct_formatters:
+            raise FBXSerializationException(f"No struct packing formatter found for primitive {obj} of type {primitive_type}", obj)
+
+        return struct.pack(struct_formatters.get(primitive_type), obj)
+
+    def deserialize(self, loader, cls, data, **kwargs):
+        if cls not in byte_sizes:
+            raise FBXSerializationException(f"Unknown byte size for primitive {cls}", data.read())
+
+        if cls not in struct_formatters:
+            raise FBXSerializationException(f"No struct packing formatter found for primitive {cls}", data.read())
+
+        try:
+            return cls(struct.unpack(struct_formatters.get(cls), data.read(byte_sizes.get(cls)))[0])
+        except struct.error as e:
+            raise FBXSerializationException(f"Unable to deserialize {cls} from data", data.read(), e)
 
 
 class StringSerializer(Serializer):
@@ -33,121 +77,6 @@ class StringSerializer(Serializer):
             return struct.unpack(f"{length}s", data.read(length))[0].decode('utf8')
         except struct.error as e:
             raise FBXSerializationException("Unable to deserialize str from data", data.read(), e)
-
-
-class CharSerializer(Serializer):
-    def serialize(self, loader, obj: str, **kwargs):
-        return struct.pack('B', obj)
-
-    def deserialize(self, loader, cls, data, **kwargs) -> str:
-        try:
-            return struct.unpack('B', data.read(1))[0]
-        except struct.error as e:
-            raise FBXSerializationException("Unable to deserialize char from data", data.read(), e)
-
-
-class IntSerializer(Serializer):
-    def serialize(self, loader, obj: int, **kwargs):
-        return struct.pack('i', obj)
-
-    def deserialize(self, loader, cls, data, **kwargs) -> int:
-        try:
-            return struct.unpack('i', data.read(4))[0]
-        except struct.error as e:
-            raise FBXSerializationException("Unable to deserialize int from data", data.read(), e)
-
-
-class LongSerializer(Serializer):
-    def serialize(self, loader, obj: long, **kwargs):
-        return struct.pack('q', obj)
-
-    def deserialize(self, loader, cls, data, **kwargs) -> long:
-        try:
-            return long(struct.unpack('q', data.read(8))[0])
-        except struct.error as e:
-            raise FBXSerializationException("Unable to deserialize long from data", data.read(), e)
-
-
-class ShortSerializer(Serializer):
-    def serialize(self, loader, obj: short, **kwargs):
-        return struct.pack('h', obj)
-
-    def deserialize(self, loader, cls, data, **kwargs) -> short:
-        try:
-            return short(struct.unpack('h', data.read(2))[0])
-        except struct.error as e:
-            raise FBXSerializationException("Unable to deserialize short from data", data.read(), e)
-
-
-class FloatSerializer(Serializer):
-    def serialize(self, loader, obj: float, **kwargs):
-        return struct.pack('f', obj)
-
-    def deserialize(self, loader, cls, data, **kwargs) -> float:
-        try:
-            return struct.unpack('f', data.read(4))[0]
-        except struct.error as e:
-            raise FBXSerializationException("Unable to deserialize float from data", data.read(), e)
-
-
-class DoubleSerializer(Serializer):
-    def serialize(self, loader, obj: double, **kwargs):
-        return struct.pack('d', obj)
-
-    def deserialize(self, loader, cls, data, **kwargs) -> double:
-        try:
-            return double(struct.unpack('d', data.read(8))[0])
-        except struct.error as e:
-            raise FBXSerializationException("Unable to deserialize double from data", data.read(), e)
-
-
-class BoolSerializer(Serializer):
-    def serialize(self, loader, obj: bool, **kwargs):
-        return struct.pack('?', obj)
-
-    def deserialize(self, loader, cls, data, **kwargs) -> bool:
-        try:
-            return struct.unpack('?', data.read(1))[0]
-        except struct.error as e:
-            raise FBXSerializationException("Unable to deserialize bool from data", data.read(), e)
-
-
-class FloatOrIntSerializer(Serializer):
-    def serialize(self, loader, obj, **kwargs):
-        if isinstance(obj, int):
-            return loader.serialize(obj, int, **kwargs)
-
-        if isinstance(obj, float):
-            return loader.serialize(obj, float, **kwargs)
-
-        raise FBXSerializationException(f"Unable to serialize float_or_int value from {obj}")
-
-    def deserialize(self, loader, cls, data, **kwargs):
-        type = data.read(1)
-
-        if not type_registry.contains(type):
-            raise FBXSerializationException(f"Invalid FBX Binary type read, {type}", data.read())
-
-        registered_type = type_registry.get(type)
-
-        if issubclass(registered_type, int):
-            return loader.deserialize(data, int, **kwargs)
-
-        if issubclass(registered_type, float):
-            return loader.deserialize(data, float, **kwargs)
-
-        raise FBXSerializationException("Unable to deserialize float_or_int from data", data.read())
-
-
-class EnumSerializer(Serializer):
-    def serialize(self, loader, obj, **kwargs):
-        return loader.serialize(obj.value, **kwargs)
-
-    def deserialize(self, loader, cls, data, **kwargs):
-        try:
-            return cls(loader.deserialize(data, int, **kwargs))
-        except FBXSerializationException as e:
-            FBXSerializationException("Unable to deserialize enum from data", cause=e)
 
 
 class BytesSerializer(Serializer):
@@ -170,7 +99,17 @@ class BytesSerializer(Serializer):
 
 
 class ListSerializer(Serializer):
-    def deserialize(self, loader, cls, data, **kwargs):
+    def serialize(self, loader, obj, **kwargs):
+        if not isinstance(obj, FBXArray):
+            raise FBXSerializationException(f"Invalid FBX Type specified for ListSerializer: {obj}", obj)
+
+        serialized = b''
+
+        serialized += loader.serialize(len(obj))
+        serialized += loader.serialize(obj.encoding)
+        serialized += loader.serialize(len())
+
+    def deserialize(self, loader, cls, data, **kwargs) -> list:
         if not issubclass(cls, FBXArray):
             raise FBXSerializationException(f"Invalid FBX Type specified for ListSerializer: {cls}", data.read())
 
@@ -210,7 +149,7 @@ class FBXNodeSerializer(Serializer):
             pos = data.tell()
 
             while data.tell() - pos < properties_len:
-                values.append(self.parse_value(loader, data, **kwargs))
+                values.append(self.parse_property(loader, data, **kwargs))
 
         node = cls(values[0]) if len(values) == 1 else cls(values) if values else cls()
 
@@ -220,7 +159,8 @@ class FBXNodeSerializer(Serializer):
             child = self.parse_child(loader, node, data, **kwargs)
             self.add_child(node, child, **kwargs)
 
-        log.debug(f"Parsed Node {name}({values}): Offset: {offset}, Properties: {properties}, Properties Len: {properties_len}, Children: {node.__dict__}")
+        log.debug(
+            f"Parsed Node {name}({values}): Offset: {offset}, Properties: {properties}, Properties Len: {properties_len}, Children: {node.__dict__}")
 
         return node
 
@@ -252,8 +192,7 @@ class FBXNodeSerializer(Serializer):
 
         setattr(node, child_name, child)
 
-
-    def parse_value(self, loader, data, **kwargs):
+    def parse_property(self, loader, data, **kwargs):
         binary_type = data.read(1)
 
         if not type_registry.contains(binary_type):
@@ -331,4 +270,3 @@ class FBXFileSerializer(FBXNodeSerializer):
         file.header_version = header_version
 
         return file
-

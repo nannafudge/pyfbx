@@ -5,9 +5,8 @@ from pybran.decorators import class_registry
 
 import pyfbx
 
-from pyfbx import loader, FBXFile, short
+from pyfbx import loader, FBXFile
 from pyfbx.exceptions import FBXException
-from pyfbx.schemas.header import FBXHeaderExtension, CreationTimeStamp
 
 logger = logging.getLogger('root')
 

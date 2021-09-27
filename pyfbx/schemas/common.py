@@ -1,8 +1,6 @@
-import enum as python_enum
+import enum
 
 from pybran.decorators import schema, field
-
-from pyfbx.exceptions import FBXTypeRegistrationException
 
 
 class long(int):
@@ -16,10 +14,6 @@ class short(int):
 class char(str):
     def __init__(self, character: str = ""):
         super().__init__(character[0] if character else "")
-
-
-class enum(python_enum.IntEnum):
-    pass
 
 
 class double(float):
@@ -37,7 +31,12 @@ class FBXNode:
 
 @schema
 class FBXArray(list):
-    __subtype__ = None
+    class Encoding(enum.IntEnum):
+        UNCOMPRESSED = 0,
+        COMPRESSED = 1
+
+    __subtype__: type = None
+    encoding: Encoding = Encoding.UNCOMPRESSED
 
 
 @schema
@@ -61,6 +60,11 @@ class LongArray(FBXArray):
 
 
 @schema
+class BoolArray(FBXArray):
+    __subtype__ = bool
+
+
+@schema
 class Properties70(FBXNode, list):
     pass
 
@@ -76,12 +80,3 @@ class Property70(FBXNode):
 @schema
 class PropertyTemplate(FBXNode):
     properties70 = field(Properties70, alias='Properties70')
-
-
-@schema
-class float_or_int:
-    def __new__(cls, *args, **kwargs):
-        if not args:
-            raise FBXTypeRegistrationException("Invalid float_or_int decleration, value required")
-
-        return type(args[0]).__new__(type(args[0], *args, **kwargs))

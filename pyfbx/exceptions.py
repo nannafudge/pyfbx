@@ -7,7 +7,7 @@ class FBXException(BaseException):
 
 
 class FBXSerializationException(FBXException):
-    def __init__(self, msg="", data: bytes = b'', cause: BaseException = None):
+    def __init__(self, msg="", data=None, cause: BaseException = None):
         self.data = data
         super().__init__(msg, cause)
 
