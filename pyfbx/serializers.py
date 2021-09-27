@@ -29,7 +29,7 @@ byte_sizes = {
 
 struct_formatters = {
     bool: '?',
-    char: 'B',
+    char: 'c',
     short: 'h',
     int: 'i',
     float: 'f',
@@ -41,11 +41,22 @@ struct_formatters = {
 class PrimitiveSerializer(Serializer):
     def serialize(self, loader, obj, **kwargs):
         primitive_type = type(obj)
+        ignore_prefix = kwargs.get('ignore_prefix', False)
 
-        if primitive_type not in struct_formatters:
+        if not ignore_prefix and primitive_type not in struct_formatters:
             raise FBXSerializationException(f"No struct packing formatter found for primitive {obj} of type {primitive_type}", obj)
 
-        return struct.pack(struct_formatters.get(primitive_type), obj)
+        if not type_registry.contains(primitive_type):
+            raise FBXSerializationException(f"No binary type found for primitive {obj} of type {primitive_type}", obj)
+
+        serialized = b''
+
+        if not ignore_prefix:
+            serialized += struct.pack('c', type_registry.get(primitive_type))
+
+        serialized += struct.pack(struct_formatters.get(primitive_type), obj)
+
+        return serialized
 
     def deserialize(self, loader, cls, data, **kwargs):
         if cls not in byte_sizes:
@@ -105,9 +116,23 @@ class ListSerializer(Serializer):
 
         serialized = b''
 
-        serialized += loader.serialize(len(obj))
-        serialized += loader.serialize(obj.encoding)
-        serialized += loader.serialize(len())
+        serialized += loader.serialize(len(obj), ignore_prefix=True)
+        serialized += loader.serialize(obj.encoding, ignore_prefix=True)
+
+        serializer = loader.get_serializer(type(obj))
+
+        serialized_list = b''
+
+        for item in obj:
+            serialized_list += serializer.serialize(loader, item, ignore_prefix=True)
+
+        if obj.encoding:
+            serialized_list = zlib.compress(serialized_list, zlib.Z_DEFAULT_COMPRESSION)
+
+        serialized += loader.serialize(len(serialized_list), ignore_prefix=True)
+        serialized += serialized_list
+
+        return serialized
 
     def deserialize(self, loader, cls, data, **kwargs) -> list:
         if not issubclass(cls, FBXArray):
@@ -138,9 +163,64 @@ class ListSerializer(Serializer):
 
 
 class FBXNodeSerializer(Serializer):
+    def serialize(self, loader, obj: FBXNode, **kwargs):
+        serialized = b''
+
+        serialized += self.serialize_property(loader, obj, **kwargs)
+
+        if isinstance(obj, list):
+            for value in obj:
+                serialized += loader.serialize(value)
+
+        if isinstance(obj, dict):
+            for name, value in obj:
+                serialized += loader.serialize(FBXNode(value, name))
+
+        serialized += self.serialize_children(loader, obj, **kwargs)
+
+        name = self.serialize_name(loader, obj, **kwargs)
+        properties = loader.serialize(len(obj.value) if isinstance(obj.value, list) else 1 if obj.value else 0, ignore_prefix=True)
+        properties_len = loader.serialize(len(properties) if obj.value else 0, ignore_prefix=True)
+        offset = loader.serialize(len(properties) + len(properties_len) + len(serialized), ignore_prefix=True)
+
+        return name + offset + properties + properties_len + serialized
+
+    def serialize_name(self, loader, obj: FBXNode, **kwargs):
+        serialized = b''
+
+        if not isinstance(obj, FBXNode) and type_registry.contains(type(obj)):
+            name = obj.__class__.__name__
+        else:
+            name = obj.name
+
+        length = len(obj.name)
+        serialized += struct.pack('B', length)
+        serialized += struct.pack(f"{length}s", bytes(name, 'utf8'))
+
+        return serialized
+
+    def serialize_property(self, loader, obj: FBXNode, **kwargs):
+        serialized = b''
+
+        if hasattr(obj, "value") and obj.value is not None:
+            if isinstance(obj.value, list):
+                for value_ in obj.value:
+                    serialized += loader.serialize(value_, **kwargs)
+            else:
+                serialized += loader.serialize(obj.value)
+
+        return serialized
+
+    def serialize_children(self, loader, obj: FBXNode, **kwargs):
+        serialized = b''
+        for child in obj.__dict__.values():
+            if isinstance(child, FBXNode):
+                serialized += loader.serialize(child)
+        return serialized
+
     def deserialize(self, loader, cls, data, **kwargs):
-        offset, properties, properties_len = self.parse_node_body(loader, data, **kwargs)
-        name = self.parse_name(data, **kwargs)
+        offset, properties, properties_len = self.deserialize_node_body(loader, data, **kwargs)
+        name = self.deserialize_name(data, **kwargs)
 
         cls = type_registry.get(name) if type_registry.contains(name) else cls
 
@@ -149,14 +229,14 @@ class FBXNodeSerializer(Serializer):
             pos = data.tell()
 
             while data.tell() - pos < properties_len:
-                values.append(self.parse_property(loader, data, **kwargs))
+                values.append(self.deserialize_property(loader, data, **kwargs))
 
         node = cls(values[0]) if len(values) == 1 else cls(values) if values else cls()
 
         node.name = name
 
         while offset - data.tell() > 0:
-            child = self.parse_child(loader, node, data, **kwargs)
+            child = self.deserialize_child(loader, data, **kwargs)
             self.add_child(node, child, **kwargs)
 
         log.debug(
@@ -164,7 +244,7 @@ class FBXNodeSerializer(Serializer):
 
         return node
 
-    def parse_child(self, loader, node, data, **kwargs):
+    def deserialize_child(self, loader, data, **kwargs):
         child = loader.deserialize(data, FBXNode, **kwargs)
 
         if not child.name:
@@ -175,7 +255,7 @@ class FBXNodeSerializer(Serializer):
     def add_child(self, node, child, **kwargs):
         node_definition = class_registry.get(type(node))
 
-        if not child:
+        if child is None:
             return
 
         if not node_definition.aliases.contains(child.name):
@@ -192,7 +272,7 @@ class FBXNodeSerializer(Serializer):
 
         setattr(node, child_name, child)
 
-    def parse_property(self, loader, data, **kwargs):
+    def deserialize_property(self, loader, data, **kwargs):
         binary_type = data.read(1)
 
         if not type_registry.contains(binary_type):
@@ -203,7 +283,7 @@ class FBXNodeSerializer(Serializer):
 
         return real_value
 
-    def parse_node_body(self, loader, data, **kwargs):
+    def deserialize_node_body(self, loader, data, **kwargs):
         offset = loader.deserialize(data, long, **kwargs)
         properties = loader.deserialize(data, long, **kwargs)
         properties_len = loader.deserialize(data, long, **kwargs)
@@ -218,7 +298,7 @@ class FBXNodeSerializer(Serializer):
 
         return read_bytes
 
-    def parse_name(self, data, **kwargs):
+    def deserialize_name(self, data, **kwargs):
         try:
             length = struct.unpack('B', data.read(1))[0]
 
@@ -248,6 +328,17 @@ class FBXFileSerializer(FBXNodeSerializer):
 
     EMPTY_NODE_SIZE = 25
 
+    def serialize(self, loader, obj: FBXFile, **kwargs):
+        serialized = b''
+
+        serialized += self.FBX_META_HEADER
+        serialized += loader.serialize(obj.fbx_header_extension.fbx_version, ignore_prefix=True)
+        serialized += self.serialize_children(loader, obj, **kwargs)
+
+        serialized += b'\x00' * self.EMPTY_NODE_SIZE * 7
+
+        return serialized
+
     def deserialize(self, loader, cls, data, **kwargs):
         meta_header = struct.unpack(f'{len(self.FBX_META_HEADER)}s', data.read(len(self.FBX_META_HEADER)))[0]
 
@@ -257,16 +348,19 @@ class FBXFileSerializer(FBXNodeSerializer):
 
         header_version = loader.deserialize(data, int, **kwargs)
 
-        file_size = os.path.getsize(data.name)
+        if hasattr(data, "name") and data.name:
+            file_size = os.path.getsize(data.name)
+        else:
+            data.read()
+            file_size = data.tell()
+            data.seek(0)
 
         file = FBXFile()
         while file_size - data.tell() > self.EMPTY_NODE_SIZE * 7:
             try:
-                child = self.parse_child(loader, file, data, **kwargs)
+                child = self.deserialize_child(loader, data, **kwargs)
                 self.add_child(file, child)
             except Exception as e:
                 raise FBXSerializationException("Unable to parse FBX File from data", data.read(), e)
-
-        file.header_version = header_version
 
         return file

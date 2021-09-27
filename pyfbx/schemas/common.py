@@ -25,8 +25,9 @@ class FBXNode:
     name: str
     value = None
 
-    def __init__(self, value=None):
+    def __init__(self, value=None, name=""):
         self.value = value
+        self.name = name
 
 
 @schema

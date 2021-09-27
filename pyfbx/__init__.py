@@ -10,25 +10,9 @@ from pyfbx.serializers import *
 from pathlib import Path
 import logging.config
 
-type_map = {
-    int: b'I',
-    short: b'Y',
-    double: b'D',
-    float: b'F',
-    long: b'L',
-    str: b'S',
-    bytes: b'R',
-    bool: b'C',
-
-    IntArray: b'i',
-    LongArray: b'l',
-    FloatArray: b'f',
-    DoubleArray: b'd',
-}
-
 
 def type_id_generator(k):
-    return type_map.get(k, k.__name__)
+    return k.__name__
 
 
 def field_name_generator(k):
@@ -44,12 +28,22 @@ logging.config.fileConfig(Path("logging.ini").absolute())
 pybran.type_registry.default_value_generator = type_id_generator
 pybran.class_registry.default_value_generator = class_definition_generator
 
+pybran.type_registry.clear()
 pybran.refresh()
 
-pybran.type_registry.add(int)
-pybran.type_registry.add(double)
-pybran.type_registry.add(object)
-pybran.type_registry.add(bool)
+pybran.type_registry.add(int, b'I')
+pybran.type_registry.add(short, b'Y')
+pybran.type_registry.add(double, b'D')
+pybran.type_registry.add(float, b'F')
+pybran.type_registry.add(long, b'L')
+pybran.type_registry.add(str, b'S')
+pybran.type_registry.add(bytes, b'R')
+pybran.type_registry.add(bool, b'C')
+
+pybran.type_registry.add(IntArray, b'i')
+pybran.type_registry.add(LongArray, b'l')
+pybran.type_registry.add(FloatArray, b'f')
+pybran.type_registry.add(DoubleArray, b'd')
 
 
 serializers = {

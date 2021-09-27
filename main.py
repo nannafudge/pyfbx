@@ -15,5 +15,12 @@ if __name__ == "__main__":
         node = loader.read("C:\\Users\\steph\\Downloads\\Shoved Reaction With Spin (2).fbx", FBXFile)
 
         print(node)
+
+        test = loader.serialize(node)
+        ree = io.BytesIO(test)
+
+        print(loader.deserialize(data=ree, cls=FBXFile))
     except FBXException as e:
         logger.error(e)
+        logger.error(e.__cause__)
+        logger.error(e.data)
