@@ -1,57 +1,99 @@
-from . import schemas, exceptions, utils
+import pybran
+from pybran import Registry, ClassDefinition
 
-from .schemas import FBXFile, FBXOptions
-from .utils import synchronized, threadsafe_generator, threadsafe_iter
+from pybran.loaders import Loader
 
-import logging
-import logging.config
+from pyfbx.exceptions import FBXValidationException
+from pyfbx.schemas import *
+from pyfbx.serializers import *
 
 from pathlib import Path
+import logging.config
 
-from marshmallow import ValidationError
+type_map = {
+    int: b'I',
+    short: b'Y',
+    double: b'D',
+    float: b'F',
+    long: b'L',
+    str: b'S',
+    bytes: b'R',
+    bool: b'C',
 
-logging.config.fileConfig('logging.conf')
+    IntArray: b'i',
+    LongArray: b'l',
+    FloatArray: b'f',
+    DoubleArray: b'd',
+}
 
-logger = logging.getLogger(__name__)
 
-def load_file(path:str, streaming: bool = False):
-    logger.debug(f'Loading {path}...')
+def type_id_generator(k):
+    return type_map.get(k, k.__name__)
 
-    options = FBXOptions(FBXOptions.Meta(streaming=streaming))
-    
-    if not Path(path).exists():
-        raise exceptions.InvalidFBXFileException(f'FBX file {path} does not exist!')
 
-    with open(path, 'rb') as fbx_file:
-        try:
-            FBXFile().load(data=fbx_file)
-        except ValidationError as e:
-            logger.error(e.valid_data)
-            raise e
+def field_name_generator(k):
+    return k.__name__ if k is type else type(k).__name__
 
-@synchronized
-def load_raw_file(path: str, streaming: bool = True):
-    logger.debug(f'Streaming: {streaming}')
 
-    if not Path(path).exists():
-        raise exceptions.InvalidFBXFileException(f'FBX file {path} does not exist!')
+def class_definition_generator(cls):
+    return ClassDefinition(cls, fields_registry=Registry(field_name_generator))
 
-    if streaming:
-        return file_stream(path)
-    else:
-        with open(path, 'rb') as fbx_file:
-            return fbx_file.read()
 
-@threadsafe_generator
-def file_stream(path):
-    with open(path, 'rb') as fbx_file:
-        fbx_file.seek(0, 2)
-        file_size = fbx_file.tell()
+logging.config.fileConfig(Path("logging.ini").absolute())
 
-        fbx_file.seek(0, 0)
+pybran.type_registry.default_value_generator = type_id_generator
+pybran.class_registry.default_value_generator = class_definition_generator
 
-        remaining = file_size - fbx_file.tell()
+pybran.refresh()
 
-        while remaining > 0:
-            yield fbx_file.readline()
-            remaining = file_size - fbx_file.tell()
+pybran.type_registry.add(int)
+pybran.type_registry.add(double)
+pybran.type_registry.add(enum)
+pybran.type_registry.add(object)
+pybran.type_registry.add(bool)
+
+
+serializers = {
+    int: IntSerializer,
+    long: LongSerializer,
+    short: ShortSerializer,
+    str: StringSerializer,
+    char: CharSerializer,
+    bool: BoolSerializer,
+    bytes: BytesSerializer,
+    list: ListSerializer,
+    float: FloatSerializer,
+    double: DoubleSerializer,
+    enum: EnumSerializer,
+    float_or_int: FloatOrIntSerializer,
+
+    FBXArray: ListSerializer,
+    IntArray: ListSerializer,
+    LongArray: ListSerializer,
+    FloatArray: ListSerializer,
+    DoubleArray: ListSerializer,
+
+    FBXFile: FBXFileSerializer,
+
+    FBXNode: FBXNodeSerializer,
+    FBXHeaderExtension: FBXNodeSerializer,
+    CreationTimeStamp: FBXNodeSerializer,
+    GlobalSettings: FBXNodeSerializer,
+    Connection: FBXNodeSerializer,
+    Connections: FBXNodeSerializer,
+    Takes: FBXNodeSerializer,
+    PropertyTemplate: FBXNodeSerializer,
+    Definitions: FBXNodeSerializer,
+    ObjectType: FBXNodeSerializer,
+    GlobalInfo: FBXNodeSerializer,
+    Document: FBXNodeSerializer,
+    Documents: FBXNodeSerializer,
+    Objects: FBXNodeSerializer,
+    Property70: FBXNodeSerializer,
+    Properties70: FBXNodeSerializer,
+    MetaData: FBXNodeSerializer,
+    References: FBXNodeSerializer,
+    Object: FBXNodeSerializer,
+}
+
+loader = Loader(serializers)
