@@ -1,3 +1,5 @@
+import sys
+
 import pybran
 from pybran import Registry, ClassDefinition
 
@@ -7,7 +9,6 @@ from pyfbx.exceptions import FBXValidationException
 from pyfbx.schemas import *
 from pyfbx.serializers import *
 
-from pathlib import Path
 import logging.config
 
 
@@ -22,8 +23,48 @@ def field_name_generator(k):
 def class_definition_generator(cls):
     return ClassDefinition(cls, fields_registry=Registry(field_name_generator))
 
+log_config = {
+    'version': 1,
+    'formatters': {
+        'default': {
+            'format': '[%(asctime)s] %(name)s: %(levelname)s - %(message).128s'
+        }
+    },
+    'filters': {},
+    'handlers': {
+        'error_handler': {
+            'class': 'logging.StreamHandler',
+            'level': 'ERROR',
+            'formatter': 'default',
+            'stream': 'ext://sys.stderr'
+        },
+        'debug_handler': {
+            'class': 'logging.StreamHandler',
+            'level': 'DEBUG',
+            'formatter': 'default',
+            'stream': 'ext://sys.stdout'
+        },
+    },
+    'loggers': {
+        'root': {
+            'level': 'ERROR',
+            'handlers': ['error_handler'],
+            'qualname': 'pyfbx'
+        },
+        'serializers': {
+            'level': 'ERROR',
+            'handlers': ['error_handler'],
+            'qualname': 'pyfbx.serializers'
+        },
+        'tests': {
+            'level': 'DEBUG',
+            'handlers': ['debug_handler'],
+            'qualname': 'pyfbx.tests'
+        }
+    }
+}
 
-logging.config.fileConfig(Path("logging.ini").absolute())
+logging.config.dictConfig(log_config)
 
 pybran.type_registry.default_value_generator = type_id_generator
 pybran.class_registry.default_value_generator = class_definition_generator
@@ -54,12 +95,13 @@ serializers = {
     bool: PrimitiveSerializer,
     float: PrimitiveSerializer,
     double: PrimitiveSerializer,
-    enum.IntEnum: PrimitiveSerializer,
+    enum.IntEnum: EnumSerializer,
 
     str: StringSerializer,
     bytes: BytesSerializer,
     list: ListSerializer,
 
+    FBXArrayEncoding: EnumSerializer,
     FBXArray: ListSerializer,
     IntArray: ListSerializer,
     LongArray: ListSerializer,

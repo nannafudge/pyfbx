@@ -1,4 +1,5 @@
 import enum
+import numpy
 
 from pybran.decorators import schema, field
 
@@ -13,7 +14,7 @@ class short(int):
 
 class char(str):
     def __init__(self, character: str = ""):
-        super().__init__(character[0] if character else "")
+        super(str).__init__(str, character[0] if character else "")
 
 
 class double(float):
@@ -30,14 +31,20 @@ class FBXNode:
         self.name = name
 
 
+class FBXArrayEncoding(enum.IntEnum):
+    UNCOMPRESSED = 0,
+    COMPRESSED = 1
+
+
 @schema
 class FBXArray(list):
-    class Encoding(enum.IntEnum):
-        UNCOMPRESSED = 0,
-        COMPRESSED = 1
-
     __subtype__: type = None
-    encoding: Encoding = Encoding.UNCOMPRESSED
+    encoding: FBXArrayEncoding = FBXArrayEncoding.UNCOMPRESSED
+
+    def __init__(self, vals: list=[], encoding: FBXArrayEncoding = FBXArrayEncoding.UNCOMPRESSED):
+        self.encoding = encoding
+
+        super().__init__(vals)
 
 
 @schema
@@ -67,7 +74,11 @@ class BoolArray(FBXArray):
 
 @schema
 class Properties70(FBXNode, list):
-    pass
+    def __init__(self, properties=[], value=None, name=""):
+        super().__init__(list, properties)
+
+        self.value = value
+        self.name = name
 
 
 @schema

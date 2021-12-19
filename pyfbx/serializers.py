@@ -4,18 +4,18 @@ import io
 import struct
 
 from pybran.decorators import class_registry, type_registry
+from pybran.exceptions import BranSerializerException
 from pybran.serializers import Serializer
 
 from pyfbx import FBXFile
 from pyfbx.exceptions import FBXSerializationException, FBXValidationException
-from pyfbx.schemas.common import FBXNode, FBXArray, long, double, short, char
+from pyfbx.schemas.common import FBXNode, FBXArray, long, double, short, char, FBXArrayEncoding
 
 import zlib
 
 import logging
 
 log = logging.getLogger(__name__)
-
 
 byte_sizes = {
     bool: 1,
@@ -41,15 +41,19 @@ struct_formatters = {
 class PrimitiveSerializer(Serializer):
     def serialize(self, loader, obj, **kwargs):
         primitive_type = type(obj)
-        ignore_prefix = kwargs.get('ignore_prefix', False)
+        ignore_prefix = kwargs.get('ignore_prefix', True)
 
-        if not ignore_prefix and primitive_type not in struct_formatters:
-            raise FBXSerializationException(f"No struct packing formatter found for primitive {obj} of type {primitive_type}", obj)
+        if primitive_type not in struct_formatters:
+            raise FBXSerializationException(
+                f"No struct packing formatter found for primitive {obj} of type {primitive_type}", obj)
 
-        if not type_registry.contains(primitive_type):
+        if not ignore_prefix and not type_registry.contains(primitive_type):
             raise FBXSerializationException(f"No binary type found for primitive {obj} of type {primitive_type}", obj)
 
         serialized = b''
+
+        if len(str(obj).encode()) < 1:
+            return serialized
 
         if not ignore_prefix:
             serialized += struct.pack('c', type_registry.get(primitive_type))
@@ -59,6 +63,16 @@ class PrimitiveSerializer(Serializer):
         return serialized
 
     def deserialize(self, loader, cls, data, **kwargs):
+        ignore_prefix = kwargs.get('ignore_prefix', True)
+
+        if not ignore_prefix:
+            data_type = struct.unpack('c', data.read(1))[0]
+
+            if not type_registry.contains(data_type):
+                raise FBXSerializationException(f"No type registered for data type {data_type}", data.read())
+
+            cls = type_registry.get(data_type)
+
         if cls not in byte_sizes:
             raise FBXSerializationException(f"Unknown byte size for primitive {cls}", data.read())
 
@@ -66,9 +80,23 @@ class PrimitiveSerializer(Serializer):
             raise FBXSerializationException(f"No struct packing formatter found for primitive {cls}", data.read())
 
         try:
-            return cls(struct.unpack(struct_formatters.get(cls), data.read(byte_sizes.get(cls)))[0])
+            data_bytes_size = byte_sizes.get(cls)
+            raw_bytes = data.read(data_bytes_size)
+
+            if len(raw_bytes) < data_bytes_size:
+                return cls()
+
+            return cls(struct.unpack(struct_formatters.get(cls), raw_bytes)[0])
         except struct.error as e:
             raise FBXSerializationException(f"Unable to deserialize {cls} from data", data.read(), e)
+
+
+class EnumSerializer(PrimitiveSerializer):
+    def serialize(self, loader, obj: enum.Enum, **kwargs):
+        return super().serialize(loader, obj.value, **kwargs)
+
+    def deserialize(self, loader, cls: enum.Enum, data, **kwargs):
+        return super().deserialize(loader, cls.__base__, data, **kwargs)
 
 
 class StringSerializer(Serializer):
@@ -110,26 +138,29 @@ class BytesSerializer(Serializer):
 
 
 class ListSerializer(Serializer):
-    def serialize(self, loader, obj, **kwargs):
-        if not isinstance(obj, FBXArray):
-            raise FBXSerializationException(f"Invalid FBX Type specified for ListSerializer: {obj}", obj)
+    def serialize(self, loader, obj: FBXArray, **kwargs):
+        if not hasattr(obj, '__subtype__') or obj.__subtype__ is None:
+            raise FBXSerializationException(f"Invalid object specified for ListSerializer, object __subtype__ is None: {type(obj)}", obj)
+
+        if not loader.serializer_registry.__contains__(obj.__subtype__):
+            raise FBXSerializationException(f"No serializer registered for class {type(obj)}", obj)
+
+        serializer = loader.get_serializer(obj.__subtype__)
 
         serialized = b''
 
-        serialized += loader.serialize(len(obj), ignore_prefix=True)
-        serialized += loader.serialize(obj.encoding, ignore_prefix=True)
-
-        serializer = loader.get_serializer(type(obj))
+        serialized += loader.serialize(len(obj))  # Length
+        serialized += loader.serialize(obj.encoding.value)  # Encoding
 
         serialized_list = b''
 
         for item in obj:
-            serialized_list += serializer.serialize(loader, item, ignore_prefix=True)
+            serialized_list += serializer.serialize(loader, item)
 
-        if obj.encoding:
-            serialized_list = zlib.compress(serialized_list, zlib.Z_DEFAULT_COMPRESSION)
+        if obj.encoding == FBXArrayEncoding.COMPRESSED:
+            serialized_list = zlib.compress(serialized_list, level=zlib.Z_DEFAULT_COMPRESSION)
 
-        serialized += loader.serialize(len(serialized_list), ignore_prefix=True)
+        serialized += loader.serialize(len(serialized_list))  # Bytes Length
         serialized += serialized_list
 
         return serialized
@@ -150,10 +181,10 @@ class ListSerializer(Serializer):
         arr = []
         if encoding:
             buffer = data.read(bytes_length)
-            decompressed = zlib.decompress(buffer, 32, bytes_length)
+            decompressed = zlib.decompress(buffer)
             raw_data = io.BytesIO(decompressed)
 
-            while raw_data.tell() < bytes_length:
+            while raw_data.tell() < len(decompressed):
                 arr.append(loader.deserialize(raw_data, cls.__subtype__, **kwargs))
         else:
             for i in range(0, length):
@@ -179,7 +210,8 @@ class FBXNodeSerializer(Serializer):
         serialized += self.serialize_children(loader, obj, **kwargs)
 
         name = self.serialize_name(loader, obj, **kwargs)
-        properties = loader.serialize(len(obj.value) if isinstance(obj.value, list) else 1 if obj.value else 0, ignore_prefix=True)
+        properties = loader.serialize(len(obj.value) if isinstance(obj.value, list) else 1 if obj.value else 0,
+                                      ignore_prefix=True)
         properties_len = loader.serialize(len(properties) if obj.value else 0, ignore_prefix=True)
         offset = loader.serialize(len(properties) + len(properties_len) + len(serialized), ignore_prefix=True)
 
