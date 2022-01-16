@@ -28,4 +28,4 @@ class Object(FBXNode):
 
     properties70 = field(Properties70, alias='Properties70')
     version = field(int, alias='Version')
-    name = field(str, alias='Name')
+    _name = field(str, alias='Name')

@@ -20,6 +20,7 @@ primitives = [
 
 logger = logging.getLogger("tests")
 
+
 def test_serialize_deserialize_sequence():
     primitive_serializer = PrimitiveSerializer()
 
@@ -35,6 +36,7 @@ def test_serialize_deserialize_sequence():
         if primitive is not char:
             assert len(serialized) == byte_sizes.get(primitive)
 
+
 def test_prefixed_serialize_deserialize_sequence():
     primitive_serializer = PrimitiveSerializer()
 
@@ -49,6 +51,7 @@ def test_prefixed_serialize_deserialize_sequence():
         deserialized = primitive_serializer.deserialize(None, primitive, BytesIO(serialized), ignore_prefix=False)
 
         assert primitive_instance == deserialized
+
 
 def test_unknown_primitive():
     primitive_serializer = PrimitiveSerializer()

@@ -10,7 +10,8 @@ from pyfbx.serializers import StringSerializer
 
 logger = logging.getLogger("tests")
 
-def test_serialize_deserialize_sequence(self):
+
+def test_serialize_deserialize_sequence():
     string_serializer = StringSerializer()
 
     test_string = "string"

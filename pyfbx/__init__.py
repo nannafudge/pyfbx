@@ -1,7 +1,4 @@
-import sys
-
 import pybran
-from pybran import Registry, ClassDefinition
 
 from pybran.loaders import Loader
 
@@ -21,7 +18,7 @@ def field_name_generator(k):
 
 
 def class_definition_generator(cls):
-    return ClassDefinition(cls, fields_registry=Registry(field_name_generator))
+    return pybran.ClassDefinition(cls, fields_registry=pybran.Registry(field_name_generator))
 
 log_config = {
     'version': 1,
@@ -85,6 +82,8 @@ pybran.type_registry.add(IntArray, b'i')
 pybran.type_registry.add(LongArray, b'l')
 pybran.type_registry.add(FloatArray, b'f')
 pybran.type_registry.add(DoubleArray, b'd')
+
+pybran.type_registry.add(Property70, 'P')
 
 
 serializers = {

@@ -2,6 +2,8 @@ import logging
 import sys
 from io import BytesIO
 
+import pytest
+
 from pyfbx import FBXSerializationException
 from pyfbx.serializers import BytesSerializer
 

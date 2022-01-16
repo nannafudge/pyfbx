@@ -17,16 +17,16 @@ arrays = [
 ]
 
 numeric_arrays = [
-    FloatArray([1.1, 1.2]),
-    DoubleArray([double(1.1), double(1.2)]),
-    IntArray([1, 2]),
-    LongArray([long(1), long(2)]),
+    FloatArray(1.1, 1.2),
+    DoubleArray(double(1.1), double(1.2)),
+    IntArray(1, 2),
+    LongArray(long(1), long(2)),
 ]
 
 logger = logging.getLogger("tests")
 
 
-def test_serialize_deserialize_numeric(self):
+def test_serialize_deserialize_numeric():
     list_serializer = ListSerializer()
 
     for array in numeric_arrays:
@@ -37,17 +37,17 @@ def test_serialize_deserialize_numeric(self):
         assert array == deserialized
 
 
-def test_serialize_deserialize_bool_array(self):
+def test_serialize_deserialize_bool_array():
     list_serializer = ListSerializer()
 
-    bool_array = BoolArray([True, False])
+    bool_array = BoolArray(True, False)
     serialized = list_serializer.serialize(pyfbx.loader, bool_array)
     deserialized = list_serializer.deserialize(pyfbx.loader, BoolArray, BytesIO(serialized))
 
     assert bool_array == deserialized
 
 
-def test_empty_list_numeric(self):
+def test_empty_list_numeric():
     list_serializer = ListSerializer()
 
     for array in arrays:
