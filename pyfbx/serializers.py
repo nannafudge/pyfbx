@@ -9,7 +9,7 @@ from pybran.serializers import Serializer
 
 from pyfbx import FBXFile
 from pyfbx.exceptions import FBXSerializationException, FBXValidationException
-from pyfbx.schemas.common import FBXNode, FBXArray, long, double, short, char, FBXArrayEncoding
+from pyfbx.core.common import FBXNode, FBXArray, long, double, short, char, FBXArrayEncoding
 
 import zlib
 
@@ -209,7 +209,7 @@ class FBXNodeSerializer(Serializer):
         children = self.serialize_children(loader, obj, **kwargs)
         name = self.serialize_name(loader, obj, **kwargs)
 
-        if isinstance(obj._value, list):
+        if obj.properties:
             num_properties = loader.serialize(long(len(obj._value)), **kwargs)
         else:
             num_properties = loader.serialize(long(1 if obj._value is not None else 0), **kwargs)
@@ -243,7 +243,7 @@ class FBXNodeSerializer(Serializer):
     def serialize_property(self, loader, obj: FBXNode, **kwargs):
         serialized = b''
 
-        if hasattr(obj, "_value") and obj._value is not None:
+        if hasattr(obj, "properties") and obj.properties is not None:
             if isinstance(obj._value, list):
                 for value_ in obj._value:
                     serialized += loader.serialize(value_, ignore_prefix=False)

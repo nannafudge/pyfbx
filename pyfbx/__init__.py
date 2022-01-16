@@ -3,7 +3,7 @@ import pybran
 from pybran.loaders import Loader
 
 from pyfbx.exceptions import FBXValidationException
-from pyfbx.schemas import *
+from pyfbx.core import *
 from pyfbx.serializers import *
 
 import logging.config
@@ -120,7 +120,7 @@ serializers = {
     PropertyTemplate: FBXNodeSerializer,
     Definitions: FBXNodeSerializer,
     ObjectType: FBXNodeSerializer,
-    GlobalInfo: FBXNodeSerializer,
+    FBXDocumentInfo: FBXNodeSerializer,
     Document: FBXNodeSerializer,
     Documents: FBXNodeSerializer,
     Objects: FBXNodeSerializer,

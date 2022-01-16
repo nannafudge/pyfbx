@@ -91,5 +91,5 @@ class FBXHeaderExtension(FBXNode):
     encryption_type = field(int, alias='EncryptionType')
     creation_time_stamp = field(CreationTimeStamp, alias='CreationTimeStamp')
     creator = field(str, alias='Creator')
-    scene_info = field(SceneInfo, alias='SceneInfo')
+    scene_info = field(FBXDocumentInfo, alias='SceneInfo')
     other_flags = field(OtherFlags, alias='OtherFlags')
